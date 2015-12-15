@@ -1,9 +1,7 @@
 class Q {
     int n;
-    boolean isPut;
+    volatile boolean isPut;
     int numOfActiveProducers;
-
-    //Object producersMonitor = new Object();
 
     synchronized void decNumOfActiveProducers() {
         this.numOfActiveProducers--;
@@ -17,23 +15,21 @@ class Q {
         return this.numOfActiveProducers;
     }
 
-    synchronized void put(int n) {
-        //synchronized(producersMonitor) {
-            while (isPut) {
-                try {
-                    wait();
-                    //producersMonitor.wait();
-                } catch (InterruptedException e) {
-                    System.out.println("Interrupted: " + e);
-                }
+    synchronized void put(int n, String producerName) {
+        while (isPut) {
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                System.out.println("Interrupted: " + e);
             }
-            this.n = n;
-            isPut = true;
-        //}
+        }
+        this.n = n;
+        System.out.println("Producer [" + producerName + "] put: " + n);
+        isPut = true;
         notifyAll();
     }
 
-    synchronized int get() {
+    synchronized int get(String consumerName) {
         while (!isPut) {
             try {
                 wait();
@@ -42,18 +38,14 @@ class Q {
             }
         }
         isPut = false;
-        // Problem is here. Not a producer is notified, the notified thread starts waiting and that's it.
-        // We need to specifically notify the producer.
-        //synchronized(producersMonitor) {
-        //    producersMonitor.notifyAll();
         notifyAll();
-        //}
+        System.out.println("Consumer [" + consumerName + "] got: " + this.n);
         return this.n;
     }
 }
 
 class Producer implements Runnable{
-    final int MAX_NUMBER = 100;
+    final int MAX_NUMBER = 10;
 
     Q q;
     Thread t;
@@ -68,12 +60,10 @@ class Producer implements Runnable{
 
     public void run() {
         for (int p = 1; p <= MAX_NUMBER ; p++) {
-            //synchronized(q) {
-                q.put(p);
-                System.out.println("Producer [" + name + "] put: " + p);
-            //}
+            q.put(p, name);
         }
         q.decNumOfActiveProducers();
+        System.out.println("Exiting producer " + name);
     }
 }
 
@@ -90,11 +80,9 @@ class Consumer implements Runnable {
 
     public void run() {
         while (q.getNumOfActiveProducers() > 0) {
-            //synchronized(q) {
-                int c = q.get();
-                System.out.println("Consumer [" + name + "] got: " + c);
-            //}
+            int c = q.get(name);
         }
+        System.out.println("Exiting consumer " + name);
     }
 }
 
