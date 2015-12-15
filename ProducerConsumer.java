@@ -1,6 +1,7 @@
 class Q {
     int n;
     volatile boolean isPut;
+    volatile boolean toFinish;
     int numOfActiveProducers;
 
     synchronized void decNumOfActiveProducers() {
@@ -30,12 +31,15 @@ class Q {
     }
 
     synchronized int get(String consumerName) {
-        while (!isPut) {
+        while (!isPut && !toFinish) {
             try {
                 wait();
             } catch (InterruptedException e) {
                 System.out.println("Interrupted: " + e);
             }
+        }
+        if (toFinish) {
+            return -1; // -1 is just a special value indicating end of consuming process
         }
         isPut = false;
         notifyAll();
@@ -81,6 +85,10 @@ class Consumer implements Runnable {
     public void run() {
         while (q.getNumOfActiveProducers() > 0) {
             int c = q.get(name);
+        }
+        synchronized(q) {
+            q.toFinish = true;
+            q.notifyAll();
         }
         System.out.println("Exiting consumer " + name);
     }
